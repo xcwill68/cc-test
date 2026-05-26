@@ -91,16 +91,20 @@ final class AnimationRenderService {
     func renderFrames(
         trip: Trip,
         mapImage: CGImage,
-        snapshot: MKMapSnapshot,
+        snapshot: MKMapSnapshot?,
         config: AnimationConfig,
         progressHandler: @escaping (Double) -> Void
     ) async throws -> [CGImage] {
         let waypoints = trip.orderedWaypoints
         guard waypoints.count >= 2 else { throw RenderError.notEnoughWaypoints }
 
-        // Project waypoint coordinates → pixel points on the map image
+        // Project waypoint coordinates → pixel points on the map image.
+        // When snapshot is nil (offline fallback) use manual lat/lon projection.
+        let region = MKCoordinateRegion.fitting(coordinates: waypoints.map { $0.coordinate }, padding: 0.15)
+        let captureSize = trip.mapStyle.snapshotCaptureSize
         let pixelPoints = waypoints.map { wp -> CGPoint in
-            snapshot.point(for: wp.coordinate)
+            if let snapshot { return snapshot.point(for: wp.coordinate) }
+            return projectCoordinate(wp.coordinate, region: region, size: captureSize)
         }
 
         // Scale pixel points from snapshotCaptureSize → outputSize
@@ -369,6 +373,17 @@ struct PhotoEvent {
     let fileName: String
     let startFrame: Int
     let endFrame: Int
+}
+
+// Manual coordinate → pixel projection used when MKMapSnapshot is unavailable
+private func projectCoordinate(_ coord: CLLocationCoordinate2D,
+                                region: MKCoordinateRegion,
+                                size: CGSize) -> CGPoint {
+    let x = (coord.longitude - (region.center.longitude - region.span.longitudeDelta / 2))
+             / region.span.longitudeDelta * size.width
+    let y = ((region.center.latitude + region.span.latitudeDelta / 2) - coord.latitude)
+             / region.span.latitudeDelta * size.height
+    return CGPoint(x: max(0, min(size.width, x)), y: max(0, min(size.height, y)))
 }
 
 final class SpriteSheet {
