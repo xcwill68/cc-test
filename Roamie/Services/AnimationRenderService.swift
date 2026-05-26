@@ -91,7 +91,7 @@ final class AnimationRenderService {
     func renderFrames(
         trip: Trip,
         mapImage: CGImage,
-        snapshot: MKMapSnapshot?,
+        snapshot: MKMapSnapshotter.Snapshot?,
         config: AnimationConfig,
         progressHandler: @escaping (Double) -> Void
     ) async throws -> [CGImage] {
@@ -193,12 +193,10 @@ final class AnimationRenderService {
             drawRoutePath(cgCtx, arcTable: arcTable, upToArc: currentArc, style: style)
 
             // Layer 3: City dots and labels for reached waypoints
+            let totalArc = arcTable.last?.arcLength ?? 1
             for (i, point) in scaledWaypointPoints.enumerated() {
-                let waypointArc = arcTable.first(where: { idx in
-                    guard let matchArc = arcTable.last(where: { $0.position == scaledWaypointPoints[i] }) else { return false }
-                    return $0.arcLength == matchArc.arcLength
-                })?.arcLength ?? CGFloat(i) / CGFloat(scaledWaypointPoints.count) * (arcTable.last?.arcLength ?? 0)
-
+                // Evenly distribute waypoint arc positions along the path
+                let waypointArc = CGFloat(i) / CGFloat(max(scaledWaypointPoints.count - 1, 1)) * totalArc
                 let reached = currentArc >= waypointArc || i == 0
                 drawCityDot(cgCtx, at: point, name: waypoints[i].name,
                             reached: reached, style: style)

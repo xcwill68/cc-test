@@ -12,7 +12,7 @@ final class PixelMapService {
     func pixelatedMapImage(
         region: MKCoordinateRegion,
         style: PixelMapStyle
-    ) async throws -> (image: CGImage, snapshot: MKMapSnapshot?) {
+    ) async throws -> (image: CGImage, snapshot: MKMapSnapshotter.Snapshot?) {
         // Try snapshot up to 3 times (MKErrorLoadingThrottled is transient)
         var lastError: Error?
         for attempt in 0..<3 {
@@ -37,7 +37,7 @@ final class PixelMapService {
     private func captureSnapshot(
         region: MKCoordinateRegion,
         style: PixelMapStyle
-    ) async throws -> MKMapSnapshot {
+    ) async throws -> MKMapSnapshotter.Snapshot {
         let options = MKMapSnapshotter.Options()
         options.region = region
         options.size = style.snapshotCaptureSize
