@@ -1,6 +1,7 @@
 import Foundation
 import MapKit
 
+@MainActor
 @Observable
 final class WaypointSearchViewModel {
     var queryText: String = ""
@@ -18,25 +19,21 @@ final class WaypointSearchViewModel {
         searchService.clear()
     }
 
-    func locateAndAdd(nextOrder: Int, completion: @escaping (Waypoint) -> Void) {
+    func locateAndAdd(nextOrder: Int, completion: @escaping @MainActor (Waypoint) -> Void) {
         isLocating = true
         errorMessage = nil
-        Task {
+        Task { @MainActor in
             do {
                 let location = try await LocationService.shared.getCurrentLocation()
                 let (name, subtitle) = try await LocationService.shared.reverseGeocode(location)
                 let wp = Waypoint(order: nextOrder, name: name, subtitle: subtitle,
                                   latitude: location.coordinate.latitude,
                                   longitude: location.coordinate.longitude)
-                await MainActor.run {
-                    isLocating = false
-                    completion(wp)
-                }
+                isLocating = false
+                completion(wp)
             } catch {
-                await MainActor.run {
-                    isLocating = false
-                    errorMessage = error.localizedDescription
-                }
+                isLocating = false
+                errorMessage = error.localizedDescription
             }
         }
     }

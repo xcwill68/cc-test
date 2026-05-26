@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 
+@MainActor
 @Observable
 final class TripEditorViewModel {
     var isShowingSearch: Bool = false
@@ -41,14 +42,18 @@ final class TripEditorViewModel {
         let items = photoPickerItems
         photoPickerItems = []
         guard !items.isEmpty else { return }
-        Task {
+        let waypointID = waypoint.id
+        // Task inherits @MainActor isolation — safe to capture SwiftData types
+        Task { @MainActor in
             let images = await PhotoStorageService.shared.process(pickerItems: items)
+            var newFileNames: [String] = []
             for image in images {
-                if let fileName = try? PhotoStorageService.shared.save(image: image, for: waypoint.id) {
-                    await MainActor.run { waypoint.photoFileNames.append(fileName) }
+                if let fileName = try? PhotoStorageService.shared.save(image: image, for: waypointID) {
+                    newFileNames.append(fileName)
                 }
             }
-            await MainActor.run { try? context.save() }
+            waypoint.photoFileNames.append(contentsOf: newFileNames)
+            try? context.save()
         }
     }
 
@@ -59,7 +64,7 @@ final class TripEditorViewModel {
     }
 
     func addLocationWaypoint(to trip: Trip, context: ModelContext) {
-        Task {
+        Task { @MainActor in
             do {
                 let location = try await LocationService.shared.getCurrentLocation()
                 let (name, subtitle) = try await LocationService.shared.reverseGeocode(location)
@@ -70,9 +75,9 @@ final class TripEditorViewModel {
                     latitude: location.coordinate.latitude,
                     longitude: location.coordinate.longitude
                 )
-                await MainActor.run { addWaypoint(waypoint, to: trip, context: context) }
+                addWaypoint(waypoint, to: trip, context: context)
             } catch {
-                await MainActor.run { errorMessage = error.localizedDescription }
+                errorMessage = error.localizedDescription
             }
         }
     }

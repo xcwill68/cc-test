@@ -4,7 +4,8 @@ import CoreLocation
 actor LocationService: NSObject {
     static let shared = LocationService()
 
-    private let manager = CLLocationManager()
+    // CLLocationManager must run on main thread
+    @MainActor private let manager = CLLocationManager()
     private var locationContinuation: AsyncStream<CLLocation>.Continuation?
     private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
 
@@ -21,7 +22,7 @@ actor LocationService: NSObject {
 
     override init() {
         super.init()
-        Task { @MainActor in
+        Task { @MainActor [self] in
             manager.delegate = self
             manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
             let status = manager.authorizationStatus
@@ -34,29 +35,29 @@ actor LocationService: NSObject {
         guard authorizationStatus == .notDetermined else { return authorizationStatus }
         return await withCheckedContinuation { continuation in
             self.authContinuation = continuation
-            Task { @MainActor in
+            Task { @MainActor [self] in
                 manager.requestWhenInUseAuthorization()
             }
         }
     }
 
     func startUpdating() {
-        Task { @MainActor in manager.startUpdatingLocation() }
+        Task { @MainActor [self] in manager.startUpdatingLocation() }
     }
 
     func stopUpdating() {
-        Task { @MainActor in manager.stopUpdatingLocation() }
+        Task { @MainActor [self] in manager.stopUpdatingLocation() }
     }
 
     func startRecording() {
         recordedLocations = []
         isRecording = true
-        Task { @MainActor in manager.startUpdatingLocation() }
+        Task { @MainActor [self] in manager.startUpdatingLocation() }
     }
 
     func stopRecording() -> [CLLocation] {
         isRecording = false
-        Task { @MainActor in manager.stopUpdatingLocation() }
+        Task { @MainActor [self] in manager.stopUpdatingLocation() }
         return recordedLocations
     }
 
@@ -85,8 +86,8 @@ actor LocationService: NSObject {
         case noPlacemark, unavailable, permissionDenied
         var errorDescription: String? {
             switch self {
-            case .noPlacemark:     return "无法解析该位置"
-            case .unavailable:     return "当前位置不可用"
+            case .noPlacemark:      return "无法解析该位置"
+            case .unavailable:      return "当前位置不可用"
             case .permissionDenied: return "请在设置中开启位置权限"
             }
         }
