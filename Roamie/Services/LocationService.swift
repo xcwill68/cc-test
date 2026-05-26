@@ -24,7 +24,8 @@ actor LocationService: NSObject {
         Task { @MainActor in
             manager.delegate = self
             manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-            authorizationStatus = manager.authorizationStatus
+            let status = manager.authorizationStatus
+            await self.handle(status: status)
         }
     }
 
